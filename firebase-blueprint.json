@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and gamification stats",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "avatar": { "type": "string" },
+        "email": { "type": "string" },
+        "streak": { "type": "number" },
+        "highestStreak": { "type": "number" },
+        "points": { "type": "number" },
+        "questRerolls": { "type": "number" },
+        "totalTransactions": { "type": "number" }
+      },
+      "required": ["name", "email", "points"]
+    },
+    "Pocket": {
+      "title": "Pocket",
+      "description": "Financial account or saving goal",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "goalAmount": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "type": { "type": "string", "enum": ["Spendable", "Saving"] }
+      },
+      "required": ["name", "currentBalance", "type"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction record",
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "storeName": { "type": "string" },
+        "source": { "type": "string", "enum": ["Manual", "OCR"] },
+        "pocketId": { "type": "string" }
+      },
+      "required": ["amount", "category", "date", "source"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Spending category with budget",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "budget": { "type": "number" },
+        "color": { "type": "string" }
+      },
+      "required": ["name", "budget"]
+    },
+    "Quest": {
+      "title": "Quest",
+      "description": "Gamified task",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "xp": { "type": "number" },
+        "progress": { "type": "number" },
+        "target": { "type": "number" },
+        "type": { "type": "string", "enum": ["daily", "weekly"] },
+        "isCompleted": { "type": "boolean" },
+        "category": { "type": "string" }
+      },
+      "required": ["title", "xp", "progress", "target", "type", "isCompleted"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document"
+    },
+    "/users/{userId}/pockets/{pocketId}": {
+      "schema": "Pocket",
+      "description": "User's financial pockets"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "User's transaction history"
+    },
+    "/users/{userId}/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "User's custom categories"
+    },
+    "/users/{userId}/quests/{questId}": {
+      "schema": "Quest",
+      "description": "User's active quests"
+    }
+  }
+}

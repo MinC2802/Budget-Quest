@@ -1,0 +1,156 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Fields:
+    //   - name: string (required)
+    //   - avatar: string
+    //   - email: string (required)
+    //   - streak: number
+    //   - highestStreak: number
+    //   - points: number (required)
+    //   - questRerolls: number
+    //   - totalTransactions: number
+    //
+    // Collection: /users/{userId}/pockets/{pocketId}
+    // Fields:
+    //   - name: string (required)
+    //   - icon: string
+    //   - goalAmount: number
+    //   - currentBalance: number (required)
+    //   - type: string (Spendable/Saving) (required)
+    //
+    // Collection: /users/{userId}/transactions/{transactionId}
+    // Fields:
+    //   - amount: number (required)
+    //   - category: string (required)
+    //   - date: string (required)
+    //   - storeName: string
+    //   - source: string (Manual/OCR) (required)
+    //   - pocketId: string
+    //
+    // Collection: /users/{userId}/categories/{categoryId}
+    // Fields:
+    //   - name: string (required)
+    //   - icon: string
+    //   - budget: number (required)
+    //   - color: string
+    //
+    // Collection: /users/{userId}/quests/{questId}
+    // Fields:
+    //   - title: string (required)
+    //   - description: string
+    //   - xp: number (required)
+    //   - progress: number (required)
+    //   - target: number (required)
+    //   - type: string (daily/weekly) (required)
+    //   - isCompleted: bool (required)
+    //   - category: string
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(allowedFields) {
+      return request.resource.data.keys().hasOnly(allowedFields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.points is number && data.points >= 0;
+    }
+
+    function isValidPocket(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.currentBalance is number &&
+             data.type in ['Spendable', 'Saving'];
+    }
+
+    function isValidTransaction(data) {
+      return data.amount is number &&
+             data.category is string &&
+             data.date is string &&
+             data.source in ['Manual', 'OCR'];
+    }
+
+    function isValidCategory(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.budget is number && data.budget >= 0;
+    }
+
+    function isValidQuest(data) {
+      return data.title is string &&
+             data.xp is number &&
+             data.progress is number &&
+             data.target is number &&
+             data.type in ['daily', 'weekly'] &&
+             data.isCompleted is bool;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+
+      match /pockets/{pocketId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidPocket(request.resource.data);
+        allow update: if isOwner(userId) && isValidPocket(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /transactions/{transactionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTransaction(request.resource.data);
+        allow update: if isOwner(userId) && isValidTransaction(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /categories/{categoryId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidCategory(request.resource.data);
+        allow update: if isOwner(userId) && isValidCategory(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /quests/{questId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidQuest(request.resource.data);
+        allow update: if isOwner(userId) && isValidQuest(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -7,6 +7,7 @@ export interface ExtractedReceiptData {
   amount: number;
   category: string;
   date: string;
+  type: 'Expense' | 'Income';
 }
 
 export async function extractReceiptData(base64Image: string, mimeType: string): Promise<ExtractedReceiptData> {
@@ -22,7 +23,7 @@ export async function extractReceiptData(base64Image: string, mimeType: string):
             },
           },
           {
-            text: "Extract the following information from this receipt: store name, total amount, category (Food, Transport, Shopping, Health, Entertainment, or Other), and date. If you can't find a piece of information, make a best guess based on the context.",
+            text: "Extract the following information from this receipt or financial document: store name/source, total amount, category (Food, Transport, Shopping, Health, Entertainment, or Other), date, and whether this is an 'Expense' or 'Income'. If you can't find a piece of information, make a best guess based on the context.",
           },
         ],
       },
@@ -36,8 +37,9 @@ export async function extractReceiptData(base64Image: string, mimeType: string):
           amount: { type: Type.NUMBER },
           category: { type: Type.STRING },
           date: { type: Type.STRING },
+          type: { type: Type.STRING, enum: ['Expense', 'Income'] },
         },
-        required: ["storeName", "amount", "category", "date"],
+        required: ["storeName", "amount", "category", "date", "type"],
       },
     },
   });

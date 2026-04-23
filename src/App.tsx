@@ -22,9 +22,20 @@ type View = 'dashboard' | 'pockets' | 'leaderboard' | 'quests' | 'category' | 'p
 
 export default function App() {
   const { darkMode, syncData, isSyncing } = useStore();
-  const [activeView, setActiveView] = useState<View>('dashboard');
+  const [activeView, setActiveView] = useState<View>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('budgetquest-view') as View) || 'dashboard';
+    }
+    return 'dashboard';
+  });
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('budgetquest-view', activeView);
+    }
+  }, [activeView]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {

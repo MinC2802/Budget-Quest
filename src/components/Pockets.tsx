@@ -77,6 +77,18 @@ export default function Pockets() {
         </div>
       </div>
 
+      {/* Total Net Worth Card */}
+      <div className="p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] bg-navy text-white shadow-xl shadow-navy/20 relative overflow-hidden">
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/5 rounded-full blur-3xl" />
+        <div className="relative z-10 space-y-1">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest opacity-60">Total Net Worth</p>
+          <h3 className="text-3xl sm:text-4xl font-black tracking-tighter">
+            <span className="text-lg sm:text-xl font-bold opacity-40 mr-1">RM</span>
+            {(totalSpendable + totalSaving).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </h3>
+        </div>
+      </div>
+
       <AddPocketModal 
         isOpen={isAddModalOpen} 
         onClose={() => {

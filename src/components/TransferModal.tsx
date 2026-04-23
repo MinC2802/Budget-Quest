@@ -16,6 +16,7 @@ export default function TransferModal({ isOpen, onClose, initialFromPocket }: Tr
   const [toPocketId, setToPocketId] = useState('');
   const [amount, setAmount] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showBalanceWarning, setShowBalanceWarning] = useState(false);
 
   // Filter pockets for "to" selection (excluding "from" pocket)
   const availableToPockets = pockets.filter(p => p.id !== fromPocketId);
@@ -27,12 +28,12 @@ export default function TransferModal({ isOpen, onClose, initialFromPocket }: Tr
     }
   }, [fromPocketId, availableToPockets, toPocketId]);
 
-  const handleTransfer = async () => {
+  const handleTransfer = async (force = false) => {
     if (!fromPocketId || !toPocketId || amount <= 0) return;
     
     const fromPocket = pockets.find(p => p.id === fromPocketId);
-    if (fromPocket && fromPocket.currentBalance < amount) {
-      alert("Insufficient balance in the source pocket!");
+    if (fromPocket && fromPocket.currentBalance < amount && !force) {
+      setShowBalanceWarning(true);
       return;
     }
 
@@ -41,6 +42,7 @@ export default function TransferModal({ isOpen, onClose, initialFromPocket }: Tr
       await transferMoney(fromPocketId, toPocketId, amount);
       onClose();
       setAmount(0);
+      setShowBalanceWarning(false);
     } catch (error) {
       console.error("Transfer failed:", error);
     } finally {
@@ -118,7 +120,7 @@ export default function TransferModal({ isOpen, onClose, initialFromPocket }: Tr
               </div>
 
               <button 
-                onClick={handleTransfer}
+                onClick={() => handleTransfer()}
                 disabled={isProcessing || amount <= 0 || !fromPocketId || !toPocketId}
                 className="w-full py-4 bg-navy text-white rounded-2xl font-bold shadow-lg shadow-navy/20 hover:bg-blue-900 disabled:opacity-30 transition-all flex items-center justify-center gap-2"
               >
@@ -126,6 +128,41 @@ export default function TransferModal({ isOpen, onClose, initialFromPocket }: Tr
                 Confirm Transfer
               </button>
             </div>
+
+            <AnimatePresence>
+              {showBalanceWarning && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="absolute inset-0 z-50 bg-white dark:bg-zinc-900 p-8 flex flex-col items-center justify-center text-center space-y-6 rounded-[2.5rem]"
+                >
+                  <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center text-amber-600 dark:text-amber-400">
+                    <ArrowRightLeft className="w-10 h-10" />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-xl font-bold">Insufficient Balance</h4>
+                    <p className="text-sm opacity-60">
+                      You're trying to transfer RM {amount.toFixed(2)}, but {pockets.find(p => p.id === fromPocketId)?.name} only has RM {pockets.find(p => p.id === fromPocketId)?.currentBalance.toFixed(2)}.
+                    </p>
+                  </div>
+                  <div className="flex flex-col w-full gap-3">
+                    <button 
+                      onClick={() => handleTransfer(true)}
+                      className="w-full py-4 bg-amber-500 text-white rounded-2xl font-bold shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-colors"
+                    >
+                      Proceed Anyway
+                    </button>
+                    <button 
+                      onClick={() => setShowBalanceWarning(false)}
+                      className="w-full py-4 bg-gray-100 dark:bg-zinc-800 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </div>
       )}

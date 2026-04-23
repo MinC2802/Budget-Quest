@@ -11,19 +11,24 @@ export default function AddTransactionModal() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [type, setType] = useState<'Expense' | 'Income'>('Expense');
   const [mockData, setMockData] = useState({ storeName: '', amount: 0, category: 'Food', pocketId: '' });
+  const [error, setError] = useState<string | null>(null);
+  const [showBalanceWarning, setShowBalanceWarning] = useState(false);
   const { addTransaction, categories, pockets } = useStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize pocketId if not set
-  if (!mockData.pocketId && pockets.length > 0) {
-    setMockData(prev => ({ ...prev, pocketId: pockets[0].id }));
-  }
+  React.useEffect(() => {
+    if (!mockData.pocketId && pockets.length > 0) {
+      setMockData(prev => ({ ...prev, pocketId: pockets[0].id }));
+    }
+  }, [pockets, mockData.pocketId]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsProcessing(true);
+    setError(null);
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
@@ -36,7 +41,7 @@ export default function AddTransactionModal() {
           category: data.category,
           pocketId: pockets[0]?.id || ''
         });
-        setType('Expense');
+        setType(data.type);
         setIsProcessing(false);
         setStep(2);
       };
@@ -44,7 +49,7 @@ export default function AddTransactionModal() {
     } catch (error) {
       console.error("OCR Error:", error);
       setIsProcessing(false);
-      alert("Failed to scan receipt. Please try again or enter manually.");
+      setError("Failed to scan receipt. Please try again or enter manually.");
     }
   };
 
@@ -52,17 +57,43 @@ export default function AddTransactionModal() {
     fileInputRef.current?.click();
   };
 
-  const handleSave = () => {
+  const handleSave = (force = false) => {
+    setError(null);
+    if (!mockData.pocketId) {
+      setError("Please select a pocket for this transaction.");
+      return;
+    }
+    if (mockData.amount <= 0) {
+      setError("Please enter a valid amount.");
+      return;
+    }
+    if (!mockData.storeName) {
+      setError("Please enter a store or source name.");
+      return;
+    }
+
+    // Balance check for expenses
+    if (type === 'Expense' && !force) {
+      const selectedPocket = pockets.find(p => p.id === mockData.pocketId);
+      if (selectedPocket && selectedPocket.currentBalance < mockData.amount) {
+        setShowBalanceWarning(true);
+        return;
+      }
+    }
+
     const finalAmount = type === 'Expense' ? -Math.abs(mockData.amount) : Math.abs(mockData.amount);
+    
+    // Ensure we are passing the correct pocketId and amount
     addTransaction({ 
       ...mockData, 
       amount: finalAmount,
       category: type === 'Expense' ? mockData.category : 'Income',
       date: new Date().toISOString(), 
-      source: step === 2 && !isProcessing ? 'OCR' : 'Manual',
+      source: step === 2 && mockData.storeName !== '' ? 'OCR' : 'Manual',
       pocketId: mockData.pocketId
     });
     setStep(3);
+    setShowBalanceWarning(false);
     setTimeout(() => {
       setIsOpen(false);
       setStep(1);
@@ -113,6 +144,17 @@ export default function AddTransactionModal() {
               >
                 <X className="w-5 h-5 opacity-50" />
               </button>
+
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold border border-red-100 dark:border-red-900/30 flex items-center gap-2"
+                >
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  {error}
+                </motion.div>
+              )}
 
               {step === 1 && (
                 <div className="text-center space-y-6 pt-4">
@@ -210,7 +252,28 @@ export default function AddTransactionModal() {
                       />
                     </div>
 
-                    {type === 'Expense' ? (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase tracking-wider opacity-50 ml-1">
+                        {type === 'Expense' ? 'Deduct from Pocket' : 'Deposit to Pocket'}
+                      </label>
+                      {pockets.length > 0 ? (
+                        <select 
+                          value={mockData.pocketId}
+                          onChange={(e) => setMockData({...mockData, pocketId: e.target.value})}
+                          className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:ring-2 ring-navy outline-none transition-all appearance-none font-bold"
+                        >
+                          {pockets.map(pocket => (
+                            <option key={pocket.id} value={pocket.id}>{pocket.name} (RM {pocket.currentBalance.toLocaleString()})</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 text-red-600 dark:text-red-400 text-xs font-bold">
+                          No pockets found. Please create a pocket first.
+                        </div>
+                      )}
+                    </div>
+
+                    {type === 'Expense' && (
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold uppercase tracking-wider opacity-50 ml-1">Category</label>
                         <select 
@@ -220,19 +283,6 @@ export default function AddTransactionModal() {
                         >
                           {categories.map(cat => (
                             <option key={cat.id} value={cat.name}>{cat.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wider opacity-50 ml-1">Deposit to Pocket</label>
-                        <select 
-                          value={mockData.pocketId}
-                          onChange={(e) => setMockData({...mockData, pocketId: e.target.value})}
-                          className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 focus:ring-2 ring-navy outline-none transition-all appearance-none font-bold"
-                        >
-                          {pockets.map(pocket => (
-                            <option key={pocket.id} value={pocket.id}>{pocket.name}</option>
                           ))}
                         </select>
                       </div>
@@ -247,7 +297,7 @@ export default function AddTransactionModal() {
                       Back
                     </button>
                     <button 
-                      onClick={handleSave} 
+                      onClick={() => handleSave()} 
                       className="flex-[2] py-4 bg-navy text-white rounded-2xl font-bold shadow-lg shadow-navy/20 hover:bg-blue-900 transition-colors"
                     >
                       Confirm & Save
@@ -255,6 +305,41 @@ export default function AddTransactionModal() {
                   </div>
                 </div>
               )}
+
+              <AnimatePresence>
+                {showBalanceWarning && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="absolute inset-0 z-50 bg-white dark:bg-zinc-900 p-8 flex flex-col items-center justify-center text-center space-y-6"
+                  >
+                    <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center text-amber-600 dark:text-amber-400">
+                      <Plus className="w-10 h-10 rotate-45" />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-xl font-bold">Insufficient Balance</h4>
+                      <p className="text-sm opacity-60">
+                        You're trying to spend RM {mockData.amount.toFixed(2)}, but this pocket only has RM {pockets.find(p => p.id === mockData.pocketId)?.currentBalance.toFixed(2)}.
+                      </p>
+                    </div>
+                    <div className="flex flex-col w-full gap-3">
+                      <button 
+                        onClick={() => handleSave(true)}
+                        className="w-full py-4 bg-amber-500 text-white rounded-2xl font-bold shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-colors"
+                      >
+                        Proceed Anyway
+                      </button>
+                      <button 
+                        onClick={() => setShowBalanceWarning(false)}
+                        className="w-full py-4 bg-gray-100 dark:bg-zinc-800 rounded-2xl font-bold hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {step === 3 && (
                 <div className="py-12 text-center space-y-6">

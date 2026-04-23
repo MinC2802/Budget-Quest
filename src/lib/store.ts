@@ -12,7 +12,8 @@ import {
   where,
   getDoc,
   serverTimestamp,
-  runTransaction
+  runTransaction,
+  increment
 } from 'firebase/firestore';
 
 export type TransactionSource = 'Manual' | 'OCR';
@@ -142,7 +143,7 @@ export const useStore = create<BudgetStore>((set, get) => ({
   categories: [],
   dailyQuests: [],
   weeklyQuests: [],
-  darkMode: false,
+  darkMode: typeof window !== 'undefined' ? localStorage.getItem('budgetquest-darkmode') === 'true' : false,
   isSyncing: false,
 
   syncData: (userId) => {
@@ -237,7 +238,12 @@ export const useStore = create<BudgetStore>((set, get) => ({
     };
   },
 
-  setDarkMode: (darkMode) => set({ darkMode }),
+  setDarkMode: (darkMode) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('budgetquest-darkmode', String(darkMode));
+    }
+    set({ darkMode });
+  },
   
   updateUser: async (updates) => {
     const userId = auth.currentUser?.uid;
@@ -259,18 +265,15 @@ export const useStore = create<BudgetStore>((set, get) => ({
 
       // Update pocket balance
       if (tx.pocketId) {
-        const pocket = get().pockets.find(p => p.id === tx.pocketId);
-        if (pocket) {
-          await updateDoc(doc(db, 'users', userId, 'pockets', tx.pocketId), {
-            currentBalance: pocket.currentBalance + tx.amount
-          });
-        }
+        await updateDoc(doc(db, 'users', userId, 'pockets', tx.pocketId), {
+          currentBalance: increment(tx.amount)
+        });
       }
 
       // Update user points and total transactions
       await updateDoc(doc(db, 'users', userId), {
-        points: get().user.points + 10,
-        totalTransactions: get().user.totalTransactions + 1
+        points: increment(10),
+        totalTransactions: increment(1)
       });
 
       // Update quest progress if OCR
